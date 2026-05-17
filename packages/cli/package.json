@@ -1,0 +1,28 @@
+{
+  "name": "@myrag/cli",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "bin": {
+    "myrag": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "clean": "rm -rf dist",
+    "lint": "tsc --noEmit",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@myrag/core": "workspace:*",
+    "@myrag/rag-engine": "workspace:*",
+    "@myrag/code-engine": "workspace:*",
+    "@myrag/router": "workspace:*",
+    "@inquirer/prompts": "^7.3.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.5",
+    "typescript": "^5.7.3"
+  }
+}
