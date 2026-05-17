@@ -29,7 +29,7 @@ interface LanguageConfig {
 const LANGUAGE_MAP: Record<string, { extensions: string[]; moduleName: string }> = {
   javascript: { extensions: [".js", ".mjs", ".cjs"], moduleName: "tree-sitter-javascript" },
   typescript: { extensions: [".ts"], moduleName: "tree-sitter-typescript" },
-  tsx: { extensions: [".tsx"], moduleName: "tree-sitter-tsx" },
+  tsx: { extensions: [".tsx"], moduleName: "tree-sitter-typescript" },
   python: { extensions: [".py", ".pyw"], moduleName: "tree-sitter-python" },
   java: { extensions: [".java"], moduleName: "tree-sitter-java" },
   go: { extensions: [".go"], moduleName: "tree-sitter-go" },
@@ -205,7 +205,15 @@ export class TreeSitterParser {
     try {
       const langModule = await import(config.moduleName);
       const parser = new Parser();
-      parser.setLanguage(langModule.default ?? langModule);
+
+      if (language === "tsx" && langModule.tsx) {
+        parser.setLanguage(langModule.tsx);
+      } else if (langModule.default) {
+        parser.setLanguage(langModule.default);
+      } else {
+        parser.setLanguage(langModule);
+      }
+
       this.parsers.set(language, parser);
       return parser;
     } catch {
