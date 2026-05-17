@@ -11,6 +11,7 @@ import {
   insertMessage,
   getMessagesBySession,
   insertCodeAnalysis,
+  insertBodyAnalysis,
 } from "@myrag/core";
 import type { ChatMessage } from "@myrag/core";
 
@@ -200,4 +201,82 @@ export async function handleIngest(target: string): Promise<string> {
   }
 
   return `Unsupported file format. Only PDF files are supported.`;
+}
+
+export async function handleBodyQuery(sourcePath: string): Promise<string> {
+  const { PoseDetector } = await import("@myrag/body-analysis");
+  const { PostureAnalyzer } = await import("@myrag/body-analysis");
+  const { BodyTypeAnalyzer } = await import("@myrag/body-analysis");
+  const { VideoProcessor } = await import("@myrag/body-analysis");
+  const { ReportGenerator } = await import("@myrag/body-analysis");
+
+  const detector = new PoseDetector();
+  const postureAnalyzer = new PostureAnalyzer();
+  const bodyTypeAnalyzer = new BodyTypeAnalyzer();
+  const reportGen = new ReportGenerator();
+
+  try {
+    const isVideo = /\.(mp4|mov|avi|mkv|webm)$/i.test(sourcePath);
+
+    if (isVideo) {
+      const videoProcessor = new VideoProcessor(detector, postureAnalyzer, bodyTypeAnalyzer);
+      const result = await videoProcessor.analyze(sourcePath);
+
+      const report = await reportGen.generate(result.aggregatePosture, result.aggregateBodyType);
+      const formatted = reportGen.formatReport(report, "video");
+
+      await insertBodyAnalysis({
+        sourceType: "video",
+        sourcePath,
+        postureScore: result.aggregatePosture.overallScore,
+        postureDeviations: result.aggregatePosture.deviations,
+        postureAngles: result.aggregatePosture.angles,
+        bodyType: result.aggregateBodyType.type,
+        bodyTypeSubtype: result.aggregateBodyType.subtype,
+        bodyMeasurements: result.aggregateBodyType.measurements,
+        bodyProportions: result.aggregateBodyType.proportions,
+        recommendations: report.recommendations,
+        exercisePlan: report.exercisePlan,
+        lifestyle: report.lifestyle,
+        fullReport: formatted,
+      });
+
+      await detector.dispose();
+      return formatted;
+    }
+
+    const pose = await detector.detectFromFile(sourcePath);
+    if (!pose) {
+      await detector.dispose();
+      return "Could not detect a person in the image. Please ensure the full body is visible in good lighting.";
+    }
+
+    const posture = postureAnalyzer.analyze(pose.keypoints);
+    const bodyType = bodyTypeAnalyzer.analyze(pose.keypoints);
+
+    const report = await reportGen.generate(posture, bodyType);
+    const formatted = reportGen.formatReport(report, "photo");
+
+    await insertBodyAnalysis({
+      sourceType: "photo",
+      sourcePath,
+      postureScore: posture.overallScore,
+      postureDeviations: posture.deviations,
+      postureAngles: posture.angles,
+      bodyType: bodyType.type,
+      bodyTypeSubtype: bodyType.subtype,
+      bodyMeasurements: bodyType.measurements,
+      bodyProportions: bodyType.proportions,
+      recommendations: report.recommendations,
+      exercisePlan: report.exercisePlan,
+      lifestyle: report.lifestyle,
+      fullReport: formatted,
+    });
+
+    await detector.dispose();
+    return formatted;
+  } catch (err) {
+    await detector.dispose().catch(() => {});
+    return `Body analysis failed: ${err instanceof Error ? err.message : String(err)}`;
+  }
 }

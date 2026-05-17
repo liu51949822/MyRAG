@@ -1,6 +1,6 @@
 import { eq, desc, sql } from "drizzle-orm";
 import { getDb } from "./connection.js";
-import { documents, chunks, sessions, messages, codeAnalyses } from "./schema.js";
+import { documents, chunks, sessions, messages, codeAnalyses, bodyAnalyses } from "./schema.js";
 
 export async function insertDocument(doc: {
   filename: string;
@@ -148,5 +148,41 @@ export async function getCodeAnalysisByProject(
     .where(eq(codeAnalyses.projectPath, projectPath))
     .orderBy(desc(codeAnalyses.analyzedAt))
     .limit(1);
+  return row ?? null;
+}
+
+export async function insertBodyAnalysis(record: {
+  sourceType: "photo" | "video";
+  sourcePath: string;
+  postureScore: number;
+  postureDeviations: unknown;
+  postureAngles: unknown;
+  bodyType: string;
+  bodyTypeSubtype: string;
+  bodyMeasurements: unknown;
+  bodyProportions: unknown;
+  recommendations: unknown;
+  exercisePlan: unknown;
+  lifestyle: unknown;
+  fullReport: string;
+}): Promise<typeof bodyAnalyses.$inferSelect> {
+  const db = await getDb();
+  const [row] = await db.insert(bodyAnalyses).values(record).returning();
+  return row;
+}
+
+export async function getBodyAnalyses(
+  limit = 10,
+): Promise<Array<typeof bodyAnalyses.$inferSelect>> {
+  const db = await getDb();
+  return db.select().from(bodyAnalyses)
+    .orderBy(desc(bodyAnalyses.analyzedAt))
+    .limit(limit);
+}
+
+export async function getBodyAnalysis(id: string): Promise<typeof bodyAnalyses.$inferSelect | null> {
+  const db = await getDb();
+  const [row] = await db.select().from(bodyAnalyses)
+    .where(eq(bodyAnalyses.id, id));
   return row ?? null;
 }

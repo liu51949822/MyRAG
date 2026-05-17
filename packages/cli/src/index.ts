@@ -25,7 +25,20 @@ async function main() {
       console.log("\nCommands:");
       console.log("  /ingest <path>  Import PDF document(s)");
       console.log("  /code <path>     Analyze a code project");
+      console.log("  /body <path>     Analyze body posture/type from photo or video");
       console.log("  /quit            Exit\n");
+      continue;
+    }
+
+    if (query.startsWith("/body")) {
+      const target = query.slice("/body".length).trim();
+      if (!target) {
+        console.log("Usage: /body <path-to-photo-or-video>");
+        continue;
+      }
+      console.log(`Analyzing body posture and type from ${target}...`);
+      const result = await session.analyzeBody(target);
+      console.log("\n" + result + "\n");
       continue;
     }
 

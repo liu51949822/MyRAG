@@ -77,3 +77,23 @@ export const codeAnalyses = pgTable("code_analyses", {
 }, (table) => ({
   projectIdx: index("idx_code_analyses_project").on(table.projectPath),
 }));
+
+export const bodyAnalyses = pgTable("body_analyses", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  sourceType: varchar("source_type", { length: 20 }).notNull().$type<"photo" | "video">(),
+  sourcePath: varchar("source_path", { length: 1000 }).notNull(),
+  postureScore: integer("posture_score").notNull(),
+  postureDeviations: jsonb("posture_deviations").notNull(),
+  postureAngles: jsonb("posture_angles").notNull(),
+  bodyType: varchar("body_type", { length: 50 }).notNull(),
+  bodyTypeSubtype: varchar("body_type_subtype", { length: 100 }).notNull(),
+  bodyMeasurements: jsonb("body_measurements").notNull(),
+  bodyProportions: jsonb("body_proportions").notNull(),
+  recommendations: jsonb("recommendations").notNull(),
+  exercisePlan: jsonb("exercise_plan").notNull(),
+  lifestyle: jsonb("lifestyle").notNull(),
+  fullReport: text("full_report").notNull(),
+  analyzedAt: timestamp("analyzed_at").defaultNow().notNull(),
+}, (table) => ({
+  typeIdx: index("idx_body_analyses_type").on(table.sourceType),
+}));

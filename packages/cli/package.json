@@ -19,6 +19,7 @@
     "@myrag/rag-engine": "workspace:*",
     "@myrag/code-engine": "workspace:*",
     "@myrag/router": "workspace:*",
+    "@myrag/body-analysis": "workspace:*",
     "@inquirer/prompts": "^7.3.2"
   },
   "devDependencies": {

@@ -16,7 +16,11 @@
   },
   "pnpm": {
     "onlyBuiltDependencies": [
-      "tree-sitter"
+      "tree-sitter",
+      "@tensorflow/tfjs-node",
+      "sharp",
+      "core-js",
+      "esbuild"
     ]
   },
   "dependencies": {

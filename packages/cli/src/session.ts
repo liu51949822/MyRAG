@@ -1,4 +1,4 @@
-import { handleQuery, handleIngest } from "./chat.js";
+import { handleQuery, handleIngest, handleBodyQuery } from "./chat.js";
 import { createSession, getMessagesBySession, listSessions } from "@myrag/core";
 import type { ChatMessage } from "@myrag/core";
 
@@ -35,6 +35,10 @@ export class SessionManager {
 
   async ingest(target: string): Promise<string> {
     return handleIngest(target);
+  }
+
+  async analyzeBody(target: string): Promise<string> {
+    return handleBodyQuery(target);
   }
 
   getHistory(): ChatMessage[] {
