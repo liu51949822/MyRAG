@@ -1,4 +1,4 @@
-import { pgTable, uuid, varchar, integer, jsonb, timestamp, text, real, customType, index } from "drizzle-orm/pg-core";
+import { pgTable, uuid, varchar, integer, jsonb, timestamp, text, customType, index } from "drizzle-orm/pg-core";
 
 /**
  * Custom pgvector column type for drizzle-orm.
