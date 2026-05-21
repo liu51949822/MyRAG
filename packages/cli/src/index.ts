@@ -25,15 +25,15 @@ async function main() {
 
     if (query === "/help") {
       console.log("\nCommands:");
-      console.log("  /ingest <path>       Import PDF document(s)");
-      console.log("  /code <path>          Analyze a code project");
-      console.log("  /body <path>          Analyze body posture/type from photo or video");
-      console.log("  /batch <dir>          Batch process all files in directory");
-      console.log("  /batch ingest <dir>   Batch ingest all PDFs");
-      console.log("  /batch body <dir>     Batch analyze all photos/videos");
-      console.log("  /plan <file.md>       Load and execute a plan/task list");
-      console.log("  /plan save <file.md>  Save updated plan");
-      console.log("  /quit                 Exit\n");
+      console.log("  /ingest <path>              Import PDF document(s)");
+      console.log("  /code <path>                Analyze a code project");
+      console.log("  /body <path>                Analyze body from photo/video");
+      console.log("  /batch [mode] <dir>         Batch loop: body|ingest|auto");
+      console.log("  /plan <file.md>             Show plan progress");
+      console.log("  /plan interactive <file>    Step through each task");
+      console.log("  /plan run <file>            Auto-execute all pending");
+      console.log("  /help                       Show this help");
+      console.log("  /quit                       Exit\n");
       continue;
     }
 
@@ -53,23 +53,51 @@ async function main() {
       if (mode === "body" || mode === "ingest") modeStr = mode;
 
       const result = await batch.run(target, modeStr);
-      console.log("\n" + batch.formatResult(result) + "\n");
+      console.log("\n" + batch.formatResult(result));
+
+      if (result.total > 0) {
+        const savedPath = await batch.saveResult(result);
+        console.log(`Report saved to ${savedPath}\n`);
+      }
       continue;
     }
 
     if (query.startsWith("/plan")) {
-      const parts = query.split(/\s+/);
+      const parts = query.split(/\s+/).filter(Boolean);
       const cmd = parts[1] || "";
-      const filePath = parts.slice(2).join(" ") || parts.slice(1).join(" ");
+      const rest = parts.slice(2).join(" ");
 
-      if (cmd === "save" && parts.length >= 3) {
-        console.log(`Plan saving via session...`);
+      if (cmd === "interactive" || cmd === "i") {
+        if (!rest) {
+          console.log("Usage: /plan interactive <file.md>");
+          continue;
+        }
+        const executor = new PlanExecutor();
+        await executor.load(rest);
+        await executor.interactiveLoop();
         continue;
       }
 
-      if (!filePath || cmd === "save") {
-        console.log("Usage: /plan <plan-file.md>");
-        console.log("  /plan save <file.md>  Save updated plan");
+      if (cmd === "run" || cmd === "r") {
+        if (!rest) {
+          console.log("Usage: /plan run <file.md>");
+          continue;
+        }
+        const executor = new PlanExecutor();
+        await executor.load(rest);
+        const plan = await executor.load(rest);
+        console.log(executor.formatProgress(plan.steps));
+        await executor.runAll();
+        console.log("\n" + executor.formatProgress(plan.steps) + "\n");
+        continue;
+      }
+
+      const filePath = parts[1] || "";
+      if (!filePath) {
+        console.log("Usage:");
+        console.log("  /plan <file.md>               Show progress");
+        console.log("  /plan interactive <file.md>   Step through each task");
+        console.log("  /plan run <file.md>           Auto-execute all pending tasks");
         continue;
       }
 

@@ -46,33 +46,32 @@ export class BatchProcessor {
     for (let i = 0; i < entries.length; i++) {
       const entry = entries[i];
       const startTime = Date.now();
-      const progress = `[${i + 1}/${entries.length}]`;
+      const tag = `[${i + 1}/${entries.length}]`;
 
-      process.stdout.write(`${progress} ${path.basename(entry.file)}... `);
+      process.stdout.write(`${tag} ${path.basename(entry.file)}... `);
 
       try {
         let summary = "";
-
         if (entry.type === "body") {
           summary = await handleBodyQuery(entry.file);
         } else if (entry.type === "ingest") {
           summary = await handleIngest(entry.file);
         }
 
-        const duration = Date.now() - startTime;
-        console.log(`✓ (${(duration / 1000).toFixed(1)}s)`);
+        const dur = Date.now() - startTime;
+        console.log(`✓ (${(dur / 1000).toFixed(1)}s)`);
 
         result.results.push({
           file: entry.file,
           type: entry.type,
           status: "ok",
           summary: summary.slice(0, 200),
-          duration,
+          duration: dur,
         });
         result.succeeded++;
       } catch (err) {
-        const duration = Date.now() - startTime;
-        console.log(`✗ (${(duration / 1000).toFixed(1)}s)`);
+        const dur = Date.now() - startTime;
+        console.log(`✗ (${(dur / 1000).toFixed(1)}s)`);
         console.error(`   Error: ${err instanceof Error ? err.message : String(err)}`);
 
         result.results.push({
@@ -80,13 +79,66 @@ export class BatchProcessor {
           type: entry.type,
           status: "error",
           summary: `Failed: ${err instanceof Error ? err.message : String(err)}`,
-          duration,
+          duration: dur,
         });
         result.failed++;
       }
     }
 
     return result;
+  }
+
+  formatResult(result: BatchResult): string {
+    const modeLabel = result.results[0]?.type === "body" ? "Body Analysis" : "Ingestion";
+    const date = new Date().toISOString().slice(0, 19).replace("T", " ");
+    const srcDir = result.results[0]?.file ? path.dirname(result.results[0].file) : "N/A";
+
+    const lines: string[] = [];
+    lines.push(`# Batch ${modeLabel} Report`);
+    lines.push(`**Date**: ${date}`);
+    lines.push(`**Source**: ${srcDir}`);
+    lines.push("");
+    lines.push(`| Status | Count |`);
+    lines.push(`|--------|-------|`);
+    lines.push(`| Total  | ${result.total} |`);
+    lines.push(`| ✅ Succeeded | ${result.succeeded} |`);
+    lines.push(`| ❌ Failed | ${result.failed} |`);
+    lines.push("");
+
+    if (result.succeeded > 0) {
+      lines.push("## Successful");
+      for (const r of result.results) {
+        if (r.status !== "ok") continue;
+        const dur = (r.duration / 1000).toFixed(1);
+        lines.push(`- **${path.basename(r.file)}** (${r.type}, ${dur}s)`);
+        const firstLine = r.summary.split("\n")[0];
+        if (firstLine) lines.push(`  ${firstLine.slice(0, 120)}`);
+      }
+      lines.push("");
+    }
+
+    if (result.failed > 0) {
+      lines.push("## Failed");
+      for (const r of result.results) {
+        if (r.status !== "error") continue;
+        lines.push(`- **${path.basename(r.file)}**: ${r.summary}`);
+      }
+      lines.push("");
+    }
+
+    return lines.join("\n");
+  }
+
+  async saveResult(result: BatchResult): Promise<string> {
+    const report = this.formatResult(result);
+    const now = new Date();
+    const ts = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}-${String(now.getHours()).padStart(2, "0")}${String(now.getMinutes()).padStart(2, "0")}`;
+    const filename = `batch-report-${ts}.md`;
+    const dir = path.join(process.cwd(), "docs");
+    await fs.mkdir(dir, { recursive: true });
+    const filePath = path.join(dir, filename);
+    await fs.writeFile(filePath, report, "utf-8");
+    return filePath;
   }
 
   private async collectFiles(
@@ -135,40 +187,5 @@ export class BatchProcessor {
         }
       }
     }
-  }
-
-  formatResult(result: BatchResult): string {
-    const lines: string[] = [];
-    lines.push(`## Batch Processing Report`);
-    lines.push("");
-    lines.push(`- **Total**: ${result.total}`);
-    lines.push(`- **Succeeded**: ${result.succeeded}`);
-    lines.push(`- **Failed**: ${result.failed}`);
-    lines.push("");
-
-    if (result.succeeded > 0) {
-      lines.push("### Successful");
-      for (const r of result.results) {
-        if (r.status === "ok") {
-          const dur = (r.duration / 1000).toFixed(1);
-          lines.push(`- **${path.basename(r.file)}** (${r.type}, ${dur}s)`);
-          const firstLine = r.summary.split("\n")[0];
-          if (firstLine) lines.push(`  ${firstLine.slice(0, 120)}`);
-        }
-      }
-      lines.push("");
-    }
-
-    if (result.failed > 0) {
-      lines.push("### Failed");
-      for (const r of result.results) {
-        if (r.status === "error") {
-          lines.push(`- **${path.basename(r.file)}**: ${r.summary}`);
-        }
-      }
-      lines.push("");
-    }
-
-    return lines.join("\n");
   }
 }

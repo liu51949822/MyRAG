@@ -1,5 +1,5 @@
 import fs from "node:fs/promises";
-import path from "node:path";
+import { input } from "@inquirer/prompts";
 
 export interface PlanStep {
   id: number;
@@ -9,46 +9,113 @@ export interface PlanStep {
 }
 
 export interface PlanDocument {
+  filePath: string;
   title: string;
   steps: PlanStep[];
   raw: string;
 }
 
 export class PlanExecutor {
+  private activePlan: PlanDocument | null = null;
+
   async load(filePath: string): Promise<PlanDocument> {
     const content = await fs.readFile(filePath, "utf-8");
     const lines = content.split("\n");
-
     const title = this.extractTitle(lines);
     const steps = this.extractSteps(lines);
 
-    console.log(`\n📋 Plan: ${title}`);
-    console.log(`   ${steps.length} task(s) found\n`);
-
-    return { title, steps, raw: content };
+    this.activePlan = { filePath, title, steps, raw: content };
+    return this.activePlan;
   }
 
-  async executeOne(step: PlanStep): Promise<void> {
-    console.log(`\n▶ Step ${step.id}: ${step.title}`);
+  async interactiveLoop(): Promise<void> {
+    const plan = this.activePlan;
+    if (!plan) {
+      console.log("No plan loaded. Use /plan <file.md> first.");
+      return;
+    }
+
+    console.log(`\n═══════════════════════════════════════`);
+    console.log(`  📋 ${plan.title}`);
+    console.log(`  ${this.progressBar(this.pct(plan.steps))} ${plan.steps.filter(s => s.status === "done").length}/${plan.steps.length}`);
+    console.log(`═══════════════════════════════════════\n`);
+
+    for (const step of plan.steps) {
+      if (step.status === "done") {
+        console.log(`  ✅ [${step.id}] ${step.title}`);
+        continue;
+      }
+      if (step.status === "skipped") {
+        console.log(`  ⏭ [${step.id}] ${step.title} (skipped)`);
+        continue;
+      }
+
+      console.log(`\n  ▶ [${step.id}] ${step.title}`);
+      console.log(`  ${"─".repeat(50)}`);
+
+      const action = await input({
+        message: "Action (enter=done, s=skip, q=quit)",
+      });
+
+      switch (action.toLowerCase()) {
+        case "s":
+        case "skip": {
+          step.status = "skipped";
+          console.log(`  ⏭ Skipped\n`);
+          break;
+        }
+        case "q":
+        case "quit": {
+          console.log("\n  Plan execution paused.");
+          await this.save();
+          return;
+        }
+        default: {
+          step.status = "done";
+          await this.save();
+          console.log(`  ✅ Marked done — plan auto-saved\n`);
+          break;
+        }
+      }
+    }
+
+    const done = plan.steps.filter(s => s.status === "done").length;
+    const skipped = plan.steps.filter(s => s.status === "skipped").length;
+    console.log(`\n═══════════════════════════════════════`);
+    console.log(`  Plan Complete: ✅ ${done} done | ⏭ ${skipped} skipped | ⬜ ${plan.steps.length - done - skipped} remaining`);
+    console.log(`  ${this.progressBar(this.pct(plan.steps))}`);
+    console.log(`═══════════════════════════════════════`);
+    await this.save();
   }
 
-  markDone(step: PlanStep): PlanStep {
-    return { ...step, status: "done" };
-  }
+  async runAll(): Promise<void> {
+    const plan = this.activePlan;
+    if (!plan) return;
 
-  markSkipped(step: PlanStep): PlanStep {
-    return { ...step, status: "skipped" };
+    const pending = plan.steps.filter(s => s.status === "pending");
+    if (pending.length === 0) {
+      console.log("All tasks already completed.");
+      return;
+    }
+
+    for (const step of pending) {
+      console.log(`\n▶ [${step.id}] ${step.title}`);
+      console.log("  Executing...");
+      step.status = "done";
+      await this.save();
+    }
+
+    console.log(`\n✅ ${pending.length} task(s) executed.`);
   }
 
   formatProgress(steps: PlanStep[]): string {
-    const done = steps.filter((s) => s.status === "done").length;
+    const done = steps.filter(s => s.status === "done").length;
     const total = steps.length;
-    const pct = total > 0 ? Math.round((done / total) * 100) : 0;
-
-    const bar = this.progressBar(pct);
+    const p = this.pct(steps);
+    const bar = this.progressBar(p);
 
     const lines: string[] = [];
-    lines.push(`\nProgress: ${bar} ${done}/${total} (${pct}%)`);
+    lines.push(`\n${bar} ${done}/${total} (${p}%)\n`);
 
     for (const step of steps) {
       const icon = step.status === "done" ? "✅" : step.status === "skipped" ? "⏭" : "⬜";
@@ -58,29 +125,23 @@ export class PlanExecutor {
     return lines.join("\n");
   }
 
-  async save(filePath: string, doc: PlanDocument): Promise<void> {
-    let content = doc.raw;
+  async save(): Promise<void> {
+    const plan = this.activePlan;
+    if (!plan) return;
+
+    let content = plan.raw;
     const lines = content.split("\n");
 
-    for (const step of doc.steps) {
-      const lineIndex = step.line - 1;
-      const oldLine = lines[lineIndex];
-
-      let newMarker: string;
-      switch (step.status) {
-        case "done": newMarker = "[x]"; break;
-        case "skipped": newMarker = "[-]"; break;
-        default: newMarker = "[ ]"; break;
-      }
-
-      const newLine = oldLine.replace(/\[[\sx-]\]/, newMarker);
-      if (newLine !== oldLine) {
-        lines[lineIndex] = newLine;
-      }
+    for (const step of plan.steps) {
+      const idx = step.line - 1;
+      const old = lines[idx];
+      const marker = step.status === "done" ? "x" : step.status === "skipped" ? "-" : " ";
+      const updated = old.replace(/\[[\sx-]\]/, `[${marker}]`);
+      if (updated !== old) lines[idx] = updated;
     }
 
-    await fs.writeFile(filePath, lines.join("\n"), "utf-8");
-    console.log(`Plan saved to ${filePath}`);
+    const output = lines.join("\n");
+    await fs.writeFile(plan.filePath, output, "utf-8");
   }
 
   private extractTitle(lines: string[]): string {
@@ -95,28 +156,29 @@ export class PlanExecutor {
   private extractSteps(lines: string[]): PlanStep[] {
     const steps: PlanStep[] = [];
     let id = 0;
-
     for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
-      const match = line.match(/^\s*[-*]\s+\[([\sx-])\]\s+(.+)/);
-      if (match) {
+      const m = lines[i].match(/^\s*[-*]\s+\[([\sx-])\]\s+(.+)/);
+      if (m) {
         id++;
-        const marker = match[1];
         steps.push({
           id,
-          title: match[2].trim(),
-          status: marker === "x" ? "done" : marker === "-" ? "skipped" : "pending",
+          title: m[2].trim(),
+          status: m[1] === "x" ? "done" : m[1] === "-" ? "skipped" : "pending",
           line: i + 1,
         });
       }
     }
-
     return steps;
   }
 
+  private pct(steps: PlanStep[]): number {
+    const done = steps.filter(s => s.status === "done").length;
+    return steps.length > 0 ? Math.round((done / steps.length) * 100) : 0;
+  }
+
   private progressBar(pct: number): string {
-    const width = 20;
-    const filled = Math.round((pct / 100) * width);
-    return "[" + "█".repeat(filled) + "░".repeat(width - filled) + "]";
+    const w = 20;
+    const filled = Math.round((pct / 100) * w);
+    return "[" + "█".repeat(filled) + "░".repeat(w - filled) + "]";
   }
 }
