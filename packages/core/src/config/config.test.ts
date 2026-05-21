@@ -7,6 +7,7 @@ describe("Config", () => {
     process.env.DATABASE_URL = "postgresql://test:test@localhost:5432/test";
     process.env.ANTHROPIC_API_KEY = "sk-ant-test-key";
     process.env.OPENAI_API_KEY = "sk-test-key";
+    delete process.env.DOCUMENTS_DIR;
   });
 
   afterAll(() => {
