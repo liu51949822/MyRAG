@@ -1,17 +1,16 @@
 import Anthropic from "@anthropic-ai/sdk";
 import OpenAI from "openai";
-import type { AppConfig } from "../config/config.js";
 
 async function getConfig() {
   const { loadConfig } = await import("../config/config.js");
   return loadConfig();
 }
+
 export interface ChatOptions {
   model?: string;
   maxTokens?: number;
   temperature?: number;
   systemPrompt?: string;
-  /** If true, return a stream of text deltas */
   stream?: boolean;
 }
 
@@ -24,15 +23,10 @@ export interface EmbeddingResult {
   tokenCount: number;
 }
 
-/** Unified LLM client interface */
 export interface LLMClient {
-  /** Send a chat completion request */
   chat(messages: ChatMessage[], options?: ChatOptions): Promise<ChatResponse>;
-  /** Stream a chat completion */
   chatStream(messages: ChatMessage[], options?: ChatOptions): AsyncIterable<string>;
-  /** Generate embeddings for text */
   embed(text: string, options?: EmbeddingOptions): Promise<EmbeddingResult>;
-  /** Generate embeddings for multiple texts in batch */
   embedBatch(texts: string[], options?: EmbeddingOptions): Promise<EmbeddingResult[]>;
 }
 
@@ -49,12 +43,9 @@ export interface ChatResponse {
     outputTokens: number;
   };
 }
+
 type LLMProvider = "anthropic" | "openai";
 
-/**
- * Create an LLM client.
- * Auto-detects provider from config.
- */
 export async function createLLMClient(): Promise<LLMClient> {
   const config = await getConfig();
   const provider: LLMProvider = config.anthropicApiKey ? "anthropic" : "openai";
@@ -62,22 +53,50 @@ export async function createLLMClient(): Promise<LLMClient> {
     ? new AnthropicClient(config.anthropicApiKey, config.llmChatModel, config.openaiApiKey, config.llmEmbeddingModel)
     : new OpenAIClient(config.openaiApiKey, config.llmChatModel, config.llmEmbeddingModel);
 }
-class AnthropicClient implements LLMClient {
-  private chatClient: Anthropic;
-  private embedClient: OpenAI;
-  private chatModel: string;
-  private embeddingModel: string;
 
-  constructor(
-    anthropicKey: string,
-    chatModel: string,
-    openaiKey: string,
-    embeddingModel: string,
-  ) {
-    this.chatClient = new Anthropic({ apiKey: anthropicKey });
-    this.embedClient = new OpenAI({ apiKey: openaiKey });
-    this.chatModel = chatModel;
+abstract class BaseLLMClient implements LLMClient {
+  protected embeddingClient: OpenAI;
+  protected embeddingModel: string;
+
+  constructor(openaiKey: string, embeddingModel: string) {
+    this.embeddingClient = new OpenAI({ apiKey: openaiKey });
     this.embeddingModel = embeddingModel;
+  }
+
+  abstract chat(messages: ChatMessage[], options?: ChatOptions): Promise<ChatResponse>;
+  abstract chatStream(messages: ChatMessage[], options?: ChatOptions): AsyncIterable<string>;
+
+  async embed(text: string, options: EmbeddingOptions = {}): Promise<EmbeddingResult> {
+    const resp = await this.embeddingClient.embeddings.create({
+      model: options.model || this.embeddingModel,
+      input: text,
+    });
+    return {
+      embedding: resp.data[0].embedding,
+      tokenCount: resp.usage.total_tokens,
+    };
+  }
+
+  async embedBatch(texts: string[], options: EmbeddingOptions = {}): Promise<EmbeddingResult[]> {
+    const resp = await this.embeddingClient.embeddings.create({
+      model: options.model || this.embeddingModel,
+      input: texts,
+    });
+    return resp.data.map((d) => ({
+      embedding: d.embedding,
+      tokenCount: Math.ceil(resp.usage.total_tokens / texts.length),
+    }));
+  }
+}
+
+class AnthropicClient extends BaseLLMClient {
+  private chatClient: Anthropic;
+  private chatModel: string;
+
+  constructor(anthropicKey: string, chatModel: string, openaiKey: string, embeddingModel: string) {
+    super(openaiKey, embeddingModel);
+    this.chatClient = new Anthropic({ apiKey: anthropicKey });
+    this.chatModel = chatModel;
   }
 
   async chat(messages: ChatMessage[], options: ChatOptions = {}): Promise<ChatResponse> {
@@ -128,38 +147,16 @@ class AnthropicClient implements LLMClient {
       }
     }
   }
-
-  async embed(text: string, options: EmbeddingOptions = {}): Promise<EmbeddingResult> {
-    const resp = await this.embedClient.embeddings.create({
-      model: options.model || this.embeddingModel,
-      input: text,
-    });
-    return {
-      embedding: resp.data[0].embedding,
-      tokenCount: resp.usage.total_tokens,
-    };
-  }
-
-  async embedBatch(texts: string[], options: EmbeddingOptions = {}): Promise<EmbeddingResult[]> {
-    const resp = await this.embedClient.embeddings.create({
-      model: options.model || this.embeddingModel,
-      input: texts,
-    });
-    return resp.data.map((d, i) => ({
-      embedding: d.embedding,
-      tokenCount: Math.ceil(resp.usage.total_tokens / texts.length),
-    }));
-  }
 }
-class OpenAIClient implements LLMClient {
+
+class OpenAIClient extends BaseLLMClient {
   private client: OpenAI;
   private chatModel: string;
-  private embeddingModel: string;
 
   constructor(apiKey: string, chatModel: string, embeddingModel: string) {
+    super(apiKey, embeddingModel);
     this.client = new OpenAI({ apiKey });
     this.chatModel = chatModel;
-    this.embeddingModel = embeddingModel;
   }
 
   async chat(messages: ChatMessage[], options: ChatOptions = {}): Promise<ChatResponse> {
@@ -199,27 +196,5 @@ class OpenAIClient implements LLMClient {
       const delta = chunk.choices[0]?.delta?.content;
       if (delta) yield delta;
     }
-  }
-
-  async embed(text: string, options: EmbeddingOptions = {}): Promise<EmbeddingResult> {
-    const resp = await this.client.embeddings.create({
-      model: options.model || this.embeddingModel,
-      input: text,
-    });
-    return {
-      embedding: resp.data[0].embedding,
-      tokenCount: resp.usage.total_tokens,
-    };
-  }
-
-  async embedBatch(texts: string[], options: EmbeddingOptions = {}): Promise<EmbeddingResult[]> {
-    const resp = await this.client.embeddings.create({
-      model: options.model || this.embeddingModel,
-      input: texts,
-    });
-    return resp.data.map((d, i) => ({
-      embedding: d.embedding,
-      tokenCount: Math.ceil(resp.usage.total_tokens / texts.length),
-    }));
   }
 }

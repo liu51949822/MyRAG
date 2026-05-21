@@ -7,7 +7,6 @@ import {
   insertDocument,
   insertChunk,
   setChunkEmbedding,
-  getDocument,
 } from "@myrag/core";
 import type { ParsedDocument } from "./pdf-parser.js";
 import type { TextChunk } from "./chunker.js";

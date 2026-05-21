@@ -21,11 +21,6 @@ export interface ParsedFile {
   dependencies: string[];
 }
 
-interface LanguageConfig {
-  extensions: string[];
-  getParser: () => Parser | null;
-}
-
 const LANGUAGE_MAP: Record<string, { extensions: string[]; moduleName: string }> = {
   javascript: { extensions: [".js", ".mjs", ".cjs"], moduleName: "tree-sitter-javascript" },
   typescript: { extensions: [".ts"], moduleName: "tree-sitter-typescript" },

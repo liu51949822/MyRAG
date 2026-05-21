@@ -144,7 +144,7 @@ async function main() {
     }
 
     process.stdout.write("Assistant: ");
-    const response = await session.ask(query, (token) => {
+    await session.ask(query, (token) => {
       process.stdout.write(token);
     });
     console.log("\n");

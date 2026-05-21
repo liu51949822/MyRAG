@@ -1,5 +1,5 @@
 import { createLLMClient, type LLMClient } from "@myrag/core";
-import type { PostureReport, PostureDeviation } from "../analysis/posture.js";
+import type { PostureReport } from "../analysis/posture.js";
 import type { BodyTypeReport } from "../analysis/body-type.js";
 
 export interface FullReport {

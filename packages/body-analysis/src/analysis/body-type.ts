@@ -68,9 +68,6 @@ export class BodyTypeAnalyzer {
   private calculateMeasurements(kp: Record<string, Keypoint>): BodyMeasurements {
     const shoulderWidth = Math.abs(kp.left_shoulder.x - kp.right_shoulder.x);
     const hipWidth = Math.abs(kp.left_hip.x - kp.right_hip.x);
-
-    const waistX = (kp.left_hip.x + kp.right_hip.x) / 2;
-    const waistY = (kp.left_shoulder.y + kp.right_shoulder.y + kp.left_hip.y + kp.right_hip.y) / 4;
     const estimatedWaistWidth = hipWidth * 0.82;
 
     const shoulderMidY = (kp.left_shoulder.y + kp.right_shoulder.y) / 2;

@@ -57,7 +57,7 @@ export class CodeAnalyzer {
     return this.client;
   }
 
-  async analyze(files: ParsedFile[], projectPath: string): Promise<BusinessTechnicalSeparation> {
+  async analyze(files: ParsedFile[]): Promise<BusinessTechnicalSeparation> {
     const allSymbols = files.flatMap((f) =>
       f.symbols.filter((s) =>
         s.type === "function" || s.type === "method" || s.type === "class" || s.type === "interface"
@@ -69,7 +69,7 @@ export class CodeAnalyzer {
     return {
       businessLogic: business,
       technicalImpl: technical,
-      summary: await this.generateSummary(business, files),
+      summary: await this.generateSummary(business),
     };
   }
 
@@ -186,7 +186,7 @@ ${symbolsText}`;
     return { business, technical };
   }
 
-  private async generateSummary(business: BusinessItem[], files: ParsedFile[]): Promise<string> {
+  private async generateSummary(business: BusinessItem[]): Promise<string> {
     if (business.length === 0) return "No business logic detected.";
 
     const client = await this.getClient();

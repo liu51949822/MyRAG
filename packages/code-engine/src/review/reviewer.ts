@@ -1,5 +1,5 @@
 import { createLLMClient, type LLMClient } from "@myrag/core";
-import type { ParsedFile, ParsedSymbol } from "../parser/parser.js";
+import type { ParsedFile } from "../parser/parser.js";
 
 export interface ReviewResult {
   score: number;

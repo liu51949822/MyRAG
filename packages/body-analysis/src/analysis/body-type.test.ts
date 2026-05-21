@@ -4,7 +4,7 @@ import { BodyTypeAnalyzer } from "./body-type.js";
 describe("BodyTypeAnalyzer", () => {
   const analyzer = new BodyTypeAnalyzer();
 
-  function makeKeypoints(shoulderW: number, hipW: number, height: number) {
+  function makeKeypoints(shoulderW: number, hipW: number) {
     const cx = 200;
     const shoulderY = 250;
     const hipY = 500;
@@ -34,20 +34,20 @@ describe("BodyTypeAnalyzer", () => {
   }
 
   it("classifies inverted triangle for wide shoulders", () => {
-    const kp = makeKeypoints(200, 120, 1000);
+    const kp = makeKeypoints(200, 120);
     const result = analyzer.analyze(kp);
     expect(result.type).toBe("inverted_triangle");
   });
 
   it("classifies pear for wide hips", () => {
-    const kp = makeKeypoints(80, 300, 1000);
+    const kp = makeKeypoints(80, 300);
     const result = analyzer.analyze(kp);
     expect(["pear", "rectangle", "unknown"]).toContain(result.type);
     expect(result.measurements.shoulderWidth).toBeLessThan(result.measurements.hipWidth);
   });
 
   it("classifies rectangle for balanced proportions", () => {
-    const kp = makeKeypoints(150, 140, 1000);
+    const kp = makeKeypoints(150, 140);
     const result = analyzer.analyze(kp);
     expect(result.measurements.shoulderWidth).toBeGreaterThan(0);
     expect(result.measurements.hipWidth).toBeGreaterThan(0);

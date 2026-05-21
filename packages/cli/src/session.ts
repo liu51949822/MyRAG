@@ -1,5 +1,5 @@
 import { handleQuery, handleIngest, handleBodyQuery } from "./chat.js";
-import { createSession, getMessagesBySession, listSessions } from "@myrag/core";
+import { createSession, getMessagesBySession } from "@myrag/core";
 import type { ChatMessage } from "@myrag/core";
 
 export class SessionManager {

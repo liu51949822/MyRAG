@@ -7,9 +7,7 @@ import { DocGenerator } from "@myrag/code-engine";
 import { IntentRouter } from "@myrag/router";
 import { loadConfig } from "@myrag/core";
 import {
-  createSession,
   insertMessage,
-  getMessagesBySession,
   insertCodeAnalysis,
   insertBodyAnalysis,
 } from "@myrag/core";
@@ -78,7 +76,7 @@ export async function handleQuery(
   return response;
 }
 
-async function handleCodeQuery(query: string, projectPath: string): Promise<string> {
+async function handleCodeQuery(_query: string, projectPath: string): Promise<string> {
   try {
     const { files, language } = await parser.parseProject(projectPath);
 
@@ -86,7 +84,7 @@ async function handleCodeQuery(query: string, projectPath: string): Promise<stri
       return `No code files found in ${projectPath}. Make sure the path is correct.`;
     }
 
-    const analysis = await analyzer.analyze(files, projectPath);
+    const analysis = await analyzer.analyze(files);
     const architecture = await analyzer.buildArchitectureReport(files);
     const review = await reviewer.review(files);
     const beginnerDoc = await docGen.generateCodeToDoc(analysis, architecture);
@@ -145,7 +143,7 @@ async function collectStream(
 
 function formatCodeAnalysis(
   analysis: Awaited<ReturnType<typeof analyzer.analyze>>,
-  architecture: Awaited<ReturnType<typeof analyzer.buildArchitectureReport>>,
+  _architecture: Awaited<ReturnType<typeof analyzer.buildArchitectureReport>>,
   review: Awaited<ReturnType<typeof reviewer.review>>,
   beginnerDoc: Awaited<ReturnType<typeof docGen.generateCodeToDoc>>,
 ): string {

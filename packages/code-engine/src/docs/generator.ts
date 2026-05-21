@@ -1,6 +1,5 @@
 import { createLLMClient, type LLMClient } from "@myrag/core";
 import type { BusinessTechnicalSeparation } from "../analysis/analyzer.js";
-import type { ArchitectureReport } from "../analysis/analyzer.js";
 
 export interface BeginnerDoc {
   overview: string;
